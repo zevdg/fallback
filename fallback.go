@@ -17,34 +17,56 @@ func main() {
 		user = "fallback"
 	}
 
-	c, err := xmpp.Dial("wtfismyip.com:5222", user, "wtfismyip.com", "password", new(xmpp.Config))
+	conn, err := xmpp.Dial("wtfismyip.com:5222", user, "wtfismyip.com", "password", new(xmpp.Config))
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Println("Sending Presence")
-	if err = c.SendStanza(xmpp.ClientPresence{XMLName: xml.Name{"jabber:client", "presence"},
+	if err = conn.SendStanza(xmpp.ClientPresence{XMLName: xml.Name{"jabber:client", "presence"},
 		Caps: new(xmpp.ClientCaps)}); err != nil {
 		panic(err)
 	}
 
-	//c.Send("fallback@wtfismyip.com", "sent from go")
+	qml.Init(nil)
+	engine := qml.NewEngine()
 
-	go requestRoster(c)
+	contactModel := &ContactModel{}
+	engine.Context().SetVar("contactModel", contactModel)
 
-	go runXmpp(c)
+	//conn.Send("fallback@wtfismyip.com", "sent from go")
 
-	if err := runQml(); err != nil {
+	go requestRoster(conn, contactModel)
+
+	go runXmpp(conn)
+
+	if err := runQml(engine); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 
 }
 
-func runQml() error {
+type ContactModel struct {
+	contacts []Contact
+	Len      int
+}
 
-	qml.Init(nil)
-	engine := qml.NewEngine()
+type Contact struct {
+	Name string
+}
+
+func (c *ContactModel) add(contactName string) {
+	c.contacts = append(c.contacts, Contact{contactName})
+	c.Len++
+	qml.Changed(c, &c.Len)
+}
+
+func (c *ContactModel) Contact(index int) Contact {
+	return c.contacts[index]
+}
+
+func runQml(engine *qml.Engine) error {
 
 	engine.On("quit", func() { os.Exit(0) })
 
@@ -59,9 +81,9 @@ func runQml() error {
 	return nil
 }
 
-func runXmpp(c *xmpp.Conn) {
-	s, err := c.Next()
-	for ; err == nil; s, err = c.Next() {
+func runXmpp(conn *xmpp.Conn) {
+	s, err := conn.Next()
+	for ; err == nil; s, err = conn.Next() {
 
 		switch val := s.Value.(type) {
 		case *xmpp.ClientMessage:
@@ -87,10 +109,10 @@ func runXmpp(c *xmpp.Conn) {
 	}
 }
 
-func requestRoster(c *xmpp.Conn) {
+func requestRoster(conn *xmpp.Conn, model *ContactModel) {
 
 	fmt.Println("requesting roster")
-	rosterChan, cookie, err := c.RequestRoster()
+	rosterChan, cookie, err := conn.RequestRoster()
 	if err != nil {
 		panic(err)
 	}
@@ -109,6 +131,11 @@ func requestRoster(c *xmpp.Conn) {
 
 	fmt.Println("Roster is:")
 	for _, r := range roster {
-		fmt.Println(r)
+		fmt.Printf("%#v\n", r)
+		name := r.Name
+		if name == "" {
+			name = r.Jid
+		}
+		model.add(name)
 	}
 }
