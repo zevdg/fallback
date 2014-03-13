@@ -36,10 +36,15 @@ func main() {
 
 		switch val := s.Value.(type) {
 		case *xmpp.ClientMessage:
-			fmt.Printf("Client Message:%#v\n", val)
+			//fmt.Printf("Client Message: %#v\n", val)
+			fmt.Printf("expected type %T\n", val)
 
 		case *xmpp.ClientPresence:
-			fmt.Printf("Client Presence:%#v\n", val)
+			//fmt.Printf("Client Presence: %#v\n", val)
+			fmt.Printf("expected type %T\n", val)
+
+		case *xmpp.ClientIQ:
+			fmt.Printf("ClientIQ: %#v\n", val)
 
 		default:
 			fmt.Printf("unexpected type %T\n", val)
