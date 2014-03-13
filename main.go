@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/agl/xmpp"
+	"gopkg.in/v0/qml"
 	"os"
 )
 
@@ -31,6 +32,34 @@ func main() {
 
 	go requestRoster(c)
 
+	go runXmpp(c)
+
+	if err := runQml(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+}
+
+func runQml() error {
+
+	qml.Init(nil)
+	engine := qml.NewEngine()
+
+	engine.On("quit", func() { os.Exit(0) })
+
+	component, err := engine.LoadFile("fallback.qml")
+	if err != nil {
+		return err
+	}
+	window := component.CreateWindow(nil)
+	window.Show()
+	window.Wait()
+
+	return nil
+}
+
+func runXmpp(c *xmpp.Conn) {
 	s, err := c.Next()
 	for ; err == nil; s, err = c.Next() {
 
