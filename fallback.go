@@ -9,15 +9,18 @@ import (
 	"os"
 )
 
-func main() {
+var userName string
 
-	user := "fallback2"
+func main() {
+	os.Setenv("APP_ID", "fallback")
+	userName = "fallback2"
+	password := "password"
 
 	if len(os.Args) > 1 && os.Args[1] == "1" {
-		user = "fallback"
+		userName = "fallback"
 	}
 
-	conn, err := xmpp.Dial("wtfismyip.com:5222", user, "wtfismyip.com", "password", new(xmpp.Config))
+	conn, err := xmpp.Dial("wtfismyip.com:5222", userName, "wtfismyip.com", password, new(xmpp.Config))
 	if err != nil {
 		panic(err)
 	}
@@ -28,15 +31,23 @@ func main() {
 		panic(err)
 	}
 
+	contacts := NewContacts()
+	convos := NewConversations(conn, contacts)
+
 	qml.Init(nil)
+
+	qml.RegisterTypes("fallback", 1, 0, []qml.TypeSpec{
+		{Init: func(value *Contact, object qml.Object) {}},
+		{Init: func(value *Conversation, object qml.Object) {}},
+	})
+
 	engine := qml.NewEngine()
 
-	contactModel := &ContactModel{}
-	engine.Context().SetVar("contactModel", contactModel)
+	engine.Context().SetVar("contactModel", contacts)
 
-	//conn.Send("fallback@wtfismyip.com", "sent from go")
+	engine.Context().SetVar("convos", convos)
 
-	go requestRoster(conn, contactModel)
+	go requestRoster(conn, contacts)
 
 	go runXmpp(conn)
 
@@ -44,26 +55,93 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
-
 }
 
-type ContactModel struct {
-	contacts []Contact
-	Len      int
+type Conversations struct {
+	contacts *Contacts
+	conn     *xmpp.Conn
+	ConvoMap map[string]*Conversation
+}
+
+func NewConversations(connection *xmpp.Conn, contacts *Contacts) *Conversations {
+	return &Conversations{contacts: contacts,
+		conn:     connection,
+		ConvoMap: make(map[string]*Conversation)}
+}
+
+func (c *Conversations) Get(id string) *Conversation {
+	convo, ok := c.ConvoMap[id]
+	if !ok {
+
+		convo = NewConversation(c.contacts.GetById(id), c.conn)
+		c.ConvoMap[id] = convo
+	}
+	return convo
+}
+
+func (c *Conversations) remove(id string) {
+	delete(c.ConvoMap, id)
+}
+
+type Conversation struct {
+	With    *Contact
+	conn    *xmpp.Conn
+	History []Message
+	//Len     int
+}
+
+func NewConversation(contact *Contact, conn *xmpp.Conn) *Conversation {
+	return &Conversation{With: contact, conn: conn, History: make([]Message, 0, 10)}
+}
+
+type Message struct {
+	Sender string
+	Msg    string
+}
+
+func (c Conversation) Send(message string) {
+	c.History = append(c.History, Message{Sender: userName, Msg: message})
+	c.conn.Send(c.With.Id, message)
+	//c.Len++
+	//qml.Changed(c, &c.Len)
+}
+
+func (c Conversation) GetMessageByIndex(index int) Message {
+	return c.History[index]
+}
+
+type Contacts struct {
+	contactMap  map[string]Contact
+	contactList []*Contact
+	Len         int
+}
+
+func NewContacts() *Contacts {
+	return &Contacts{contactMap: make(map[string]Contact)}
 }
 
 type Contact struct {
-	Name string
+	Id string
 }
 
-func (c *ContactModel) add(contactName string) {
-	c.contacts = append(c.contacts, Contact{contactName})
+func (c *Contacts) add(id string) {
+	contact := Contact{Id: id}
+	c.contactMap[id] = contact
+	c.contactList = append(c.contactList, &contact)
 	c.Len++
 	qml.Changed(c, &c.Len)
 }
 
-func (c *ContactModel) Contact(index int) Contact {
-	return c.contacts[index]
+func (c *Contacts) GetByIndex(index int) *Contact {
+	return c.contactList[index]
+}
+
+func (c *Contacts) GetById(id string) *Contact {
+	contact, ok := c.contactMap[id]
+	if !ok {
+		panic("contact " + id + " doesn't exist")
+	}
+	return &contact
 }
 
 func runQml(engine *qml.Engine) error {
@@ -109,7 +187,7 @@ func runXmpp(conn *xmpp.Conn) {
 	}
 }
 
-func requestRoster(conn *xmpp.Conn, model *ContactModel) {
+func requestRoster(conn *xmpp.Conn, model *Contacts) {
 
 	fmt.Println("requesting roster")
 	rosterChan, cookie, err := conn.RequestRoster()
