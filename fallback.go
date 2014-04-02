@@ -7,25 +7,25 @@ import (
 	"github.com/agl/xmpp"
 	"gopkg.in/v0/qml"
 	"os"
+	"strings"
 )
 
-var userName string
+var me *Contact
 
 func main() {
 	os.Setenv("APP_ID", "fallback")
-	userName = "fallback2"
+	me = &Contact{Id: "fallback@wtfismyip.com", Alias: "Me", IsMe: true}
 	password := "password"
 
 	if len(os.Args) > 1 && os.Args[1] == "1" {
-		userName = "fallback"
+		me.Id = "fallback2@wtfismyip.com"
 	}
-
+	userName := me.Id[:strings.Index(me.Id, "@")]
 	conn, err := xmpp.Dial("wtfismyip.com:5222", userName, "wtfismyip.com", password, new(xmpp.Config))
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("Sending Presence")
 	if err = conn.SendStanza(xmpp.ClientPresence{XMLName: xml.Name{"jabber:client", "presence"},
 		Caps: new(xmpp.ClientCaps)}); err != nil {
 		panic(err)
@@ -36,20 +36,17 @@ func main() {
 
 	qml.Init(nil)
 
-	qml.RegisterTypes("fallback", 1, 0, []qml.TypeSpec{
-		{Init: func(value *Contact, object qml.Object) {}},
-		{Init: func(value *Conversation, object qml.Object) {}},
-	})
-
 	engine := qml.NewEngine()
 
 	engine.Context().SetVar("contactModel", contacts)
 
 	engine.Context().SetVar("convos", convos)
 
+	contacts.add(me)
+
 	go requestRoster(conn, contacts)
 
-	go runXmpp(conn)
+	go runXmpp(conn, convos, contacts)
 
 	if err := runQml(engine); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -61,22 +58,28 @@ type Conversations struct {
 	contacts *Contacts
 	conn     *xmpp.Conn
 	ConvoMap map[string]*Conversation
+	Current  *Conversation
 }
 
 func NewConversations(connection *xmpp.Conn, contacts *Contacts) *Conversations {
 	return &Conversations{contacts: contacts,
 		conn:     connection,
-		ConvoMap: make(map[string]*Conversation)}
+		ConvoMap: make(map[string]*Conversation),
+		Current:  &Conversation{}}
 }
 
 func (c *Conversations) Get(id string) *Conversation {
 	convo, ok := c.ConvoMap[id]
 	if !ok {
-
 		convo = NewConversation(c.contacts.GetById(id), c.conn)
 		c.ConvoMap[id] = convo
 	}
 	return convo
+}
+
+func (c *Conversations) ChangeCurrent(id string) {
+	c.Current = c.Get(id)
+	qml.Changed(c, &c.Current)
 }
 
 func (c *Conversations) remove(id string) {
@@ -86,50 +89,54 @@ func (c *Conversations) remove(id string) {
 type Conversation struct {
 	With    *Contact
 	conn    *xmpp.Conn
-	History []Message
-	//Len     int
+	history []*Message
+	Len     int
 }
 
 func NewConversation(contact *Contact, conn *xmpp.Conn) *Conversation {
-	return &Conversation{With: contact, conn: conn, History: make([]Message, 0, 10)}
+	return &Conversation{With: contact, conn: conn, history: make([]*Message, 0, 10)}
 }
 
 type Message struct {
-	Sender string
+	Sender *Contact
 	Msg    string
 }
 
-func (c Conversation) Send(message string) {
-	c.History = append(c.History, Message{Sender: userName, Msg: message})
-	c.conn.Send(c.With.Id, message)
-	//c.Len++
-	//qml.Changed(c, &c.Len)
+//func (m Message)
+
+func (c *Conversation) AddMsg(msg *Message) {
+	c.history = append(c.history, msg)
+	c.Len++
+	qml.Changed(c, &c.Len)
 }
 
-func (c Conversation) GetMessageByIndex(index int) Message {
-	return c.History[index]
+func (c *Conversation) Send(message string) {
+	c.AddMsg(&Message{Sender: me, Msg: message})
+	fmt.Printf("msg: %#v\n", c.history[len(c.history)-1])
+	c.conn.Send(c.With.Id, message)
+}
+
+func (c *Conversation) GetMessageByIndex(index int) *Message {
+	return c.history[index]
 }
 
 type Contacts struct {
-	contactMap  map[string]Contact
+	contactMap  map[string]*Contact
 	contactList []*Contact
 	Len         int
 }
 
 func NewContacts() *Contacts {
-	return &Contacts{contactMap: make(map[string]Contact)}
+	return &Contacts{contactMap: make(map[string]*Contact)}
 }
 
-type Contact struct {
-	Id string
-}
-
-func (c *Contacts) add(id string) {
-	contact := Contact{Id: id}
-	c.contactMap[id] = contact
-	c.contactList = append(c.contactList, &contact)
-	c.Len++
-	qml.Changed(c, &c.Len)
+func (c *Contacts) add(contact *Contact) {
+	c.contactMap[contact.Id] = contact
+	if !contact.IsMe {
+		c.contactList = append(c.contactList, contact)
+		c.Len++
+		qml.Changed(c, &c.Len)
+	}
 }
 
 func (c *Contacts) GetByIndex(index int) *Contact {
@@ -139,9 +146,23 @@ func (c *Contacts) GetByIndex(index int) *Contact {
 func (c *Contacts) GetById(id string) *Contact {
 	contact, ok := c.contactMap[id]
 	if !ok {
-		panic("contact " + id + " doesn't exist")
+		panic("contact '" + id + "' doesn't exist")
 	}
-	return &contact
+	return contact
+}
+
+type Contact struct {
+	Id    string
+	Alias string
+	IsMe  bool
+}
+
+func (c Contact) Name() string {
+	name := c.Alias
+	if name == "" {
+		name = c.Id[:strings.LastIndex(c.Id, "@")]
+	}
+	return name
 }
 
 func runQml(engine *qml.Engine) error {
@@ -159,14 +180,18 @@ func runQml(engine *qml.Engine) error {
 	return nil
 }
 
-func runXmpp(conn *xmpp.Conn) {
+func runXmpp(conn *xmpp.Conn, convos *Conversations, contacts *Contacts) {
 	s, err := conn.Next()
 	for ; err == nil; s, err = conn.Next() {
 
 		switch val := s.Value.(type) {
 		case *xmpp.ClientMessage:
-			//fmt.Printf("Client Message: %#v\n", val)
-			fmt.Printf("expected type %T\n", val)
+			fmt.Printf("Client Message: %#v\n", val)
+			sender := val.From[:strings.LastIndex(val.From, "/")]
+			convo := convos.Get(sender)
+			if val.Body != "" {
+				convo.AddMsg(&Message{Sender: contacts.GetById(sender), Msg: val.Body})
+			}
 
 		case *xmpp.ClientPresence:
 			//fmt.Printf("Client Presence: %#v\n", val)
@@ -187,9 +212,8 @@ func runXmpp(conn *xmpp.Conn) {
 	}
 }
 
-func requestRoster(conn *xmpp.Conn, model *Contacts) {
+func requestRoster(conn *xmpp.Conn, contacts *Contacts) {
 
-	fmt.Println("requesting roster")
 	rosterChan, cookie, err := conn.RequestRoster()
 	if err != nil {
 		panic(err)
@@ -199,7 +223,7 @@ func requestRoster(conn *xmpp.Conn, model *Contacts) {
 
 	s, ok := <-rosterChan
 	if !ok {
-		panic("No Roster Receieved")
+		panic("Error recieving on roster channel")
 	}
 
 	roster, err := xmpp.ParseRoster(s)
@@ -210,10 +234,6 @@ func requestRoster(conn *xmpp.Conn, model *Contacts) {
 	fmt.Println("Roster is:")
 	for _, r := range roster {
 		fmt.Printf("%#v\n", r)
-		name := r.Name
-		if name == "" {
-			name = r.Jid
-		}
-		model.add(name)
+		contacts.add(&Contact{Id: r.Jid, Alias: r.Name})
 	}
 }

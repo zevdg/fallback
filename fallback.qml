@@ -1,6 +1,5 @@
 import QtQuick 2.0
 import Ubuntu.Components 0.1
-import fallback 1.0
 
 MainView {
     width: units.gu(48)
@@ -26,17 +25,18 @@ MainView {
                     Component {
                         id: contactDelegate
                         Item {
-                            width: units.gu(48); height: units.gu(5)
-                            Column {
+                            width: units.gu(48)
+                            height: units.gu(5)
+                            Item {
                                 id: icon
                                 width: units.gu(5)
                             }
-                            Column {
+                            Item {
                                 id: name
-                                anchors.left : icon.right
-                                Text { text: contactModel.getByIndex(index).id }
+                                anchors.left: icon.right
+                                Text { text: contactModel.getByIndex(index).name() }
                             }
-                            Column {
+                            Item {
                                 id: status
                                 width: units.gu(5)
                                 anchors.right : parent.right
@@ -54,46 +54,62 @@ MainView {
                         anchors.fill: parent
                         model: contactModel.len
                         delegate: contactDelegate
-                        highlight: Rectangle { color: "lightsteelblue"; radius: 5 }
                         focus: true
                     }
                 }
             }
             Tab {
                 id: conversationTab
-                title: i18n.tr("Contact Name")
+                title: "Contact Name Goes Here"
                 property string withId
                 Page {
                     id: conversationPage
-                    Column {
-                        id: messages
-
-                    }
-                    /*
+                    
                     Component {
                         id: messageDelegate
-                        Item {
-                            Text { text: convo().getMessageByIndex(index).sender + ": "
-                                    + convo().getMessageByIndex(index).msg }
+                        Column {
+                            width: units.gu(48)
+                            Row{
+                                width: parent.width 
+                                Text { 
+                                    width: parent.width
+                                    wrapMode: Text.Wrap
+                                    textFormat: Text.StyledText
+                                    text: makeMsgText(convos.current.getMessageByIndex(index))
+
+                                    function makeMsgText(msg){
+                                        var text = '<font color="'
+                                        if ( msg.sender.isMe ){
+                                            text += 'red';
+                                        }else{
+                                            text += 'blue';
+                                        }
+                                        text += '">' + msg.sender.name() + ": </font>" + msg.msg
+                                        return text
+                                    }
+                                }
+                            }
                         }
                     }
+
                     ListView {
                         id: messageList
                         anchors.top : parent.top
-                        anchors.bottom : entry.bottom
+                        anchors.bottom : entry.top
                         anchors.left : parent.left
                         anchors.right : parent.right
-                        //model: convo().len
+                        model: convos.current.len
                         delegate: messageDelegate
-                        highlight: Rectangle { color: "lightsteelblue"; radius: 5 }
                         focus: true
                     }
-                    */
+                    
                     TextArea {
                         id: entry
                         anchors.bottom: parent.bottom
                         anchors.left: parent.left
                         anchors.right: sendBtn.left
+                        focus: true
+                        Keys.onReturnPressed: parent.send()
 
                         autoSize: true
                         maximumLineCount: 3
@@ -107,21 +123,21 @@ MainView {
                         anchors.right: parent.right
 
                         iconSource: '/usr/share/icons/gnome/48x48/actions/document-send.png'
-                        onClicked: {
-                            parent.convo().send(entry.text)
-                            entry.text = ""
-                        }
+                        onClicked: parent.send()
                     }
 
-                    function convo(){
-                        return convos.get(conversationTab.withId)
+                    function send(){
+                        if( entry.text == ""){
+                            return;
+                        }
+                        convos.current.send(entry.text);
+                        entry.text = "";
                     }
                 }
                 function init(id){
                     conversationTab.title = id;
-                    conversationTab.withId = id;
                     tabs.selectedTabIndex = 1;
-                    //messageList.model = conversationPage.convo().len
+                    convos.changeCurrent(id)
                 }
             }
         }
