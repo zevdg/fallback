@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"github.com/psywolf/xmpp"
 	"gopkg.in/qml.v0"
+	"io/ioutil"
 	"os"
 	"strings"
-	"io/ioutil"
 )
 
 var me *Contact
@@ -17,7 +17,7 @@ var APP_ID string
 func main() {
 	APP_ID = "com.ubuntu.developer.zev.fallback"
 	os.Setenv("APP_ID", APP_ID)
-	
+
 	contacts := NewContacts()
 	convos := NewConversations(contacts)
 
@@ -32,7 +32,7 @@ func main() {
 	engine.Context().SetVar("xmpp", convos)
 
 	qml.RegisterTypes("Fallback.Messenger.FileIO", 1, 0, []qml.TypeSpec{{
-		Init: func(f *FileIO, obs qml.Object){},
+		Init: func(f *FileIO, obs qml.Object) {},
 	}})
 
 	if err := runQml(engine); err != nil {
@@ -41,11 +41,11 @@ func main() {
 	}
 }
 
-func (c *Conversations) Login(user, token string){
+func (c *Conversations) Login(user, token string) {
 	config := &xmpp.Config{
 		Authentication: &xmpp.Auth{
 			Mechanism: "X-OAUTH2",
-			Service: "oauth2",
+			Service:   "oauth2",
 			Namespace: "http://www.google.com/talk/protocol/auth"}}
 	fmt.Println("pre dial")
 	conn, err := xmpp.Dial("talk.google.com:5222", user, "gmail.com", token, config)
@@ -261,7 +261,6 @@ func requestRoster(conn *xmpp.Conn, contacts *Contacts) {
 	}
 }
 
-
 type FileIO struct {
 	dataDir string
 }
@@ -269,14 +268,13 @@ type FileIO struct {
 func (fIO *FileIO) DataDir() string {
 	if fIO.dataDir == "" {
 		path := os.Getenv("XDG_DATA_HOME")
-		if path == ""{
-			path = os.Getenv("HOME")+"/.local/share"
+		if path == "" {
+			path = os.Getenv("HOME") + "/.local/share"
 		}
 		fIO.dataDir = path + "/" + APP_ID
 	}
 	return fIO.dataDir
 }
-
 
 func (fIO *FileIO) TokenPath() string {
 	return fIO.DataDir() + "/token"
@@ -291,13 +289,13 @@ func (fIO *FileIO) Read() string {
 func (fIO *FileIO) Write(in string) {
 
 	if fi, err := os.Stat(fIO.DataDir()); err != nil {
-    	if os.IsNotExist(err) {
-	        os.Mkdir(fIO.DataDir(), 0755)
-	    } else {
-	        panic(err)
-	    }
-	}else if !fi.IsDir() {
-		panic("data path '"+fIO.DataDir() + "' is a file.  It should be a directory!")
+		if os.IsNotExist(err) {
+			os.Mkdir(fIO.DataDir(), 0755)
+		} else {
+			panic(err)
+		}
+	} else if !fi.IsDir() {
+		panic("data path '" + fIO.DataDir() + "' is a file.  It should be a directory!")
 	}
 
 	//todo error handling
