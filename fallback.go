@@ -4,35 +4,20 @@ package main
 import (
 	"encoding/xml"
 	"fmt"
-	"github.com/agl/xmpp"
-	"gopkg.in/v0/qml"
+	"github.com/psywolf/xmpp"
+	"gopkg.in/qml.v0"
 	"os"
 	"strings"
+	"io/ioutil"
 )
 
 var me *Contact
 
 func main() {
 	os.Setenv("APP_ID", "fallback")
-	me = &Contact{Id: "fallback@wtfismyip.com", Alias: "Me", IsMe: true}
-	password := "password"
-
-	if len(os.Args) > 1 && os.Args[1] == "1" {
-		me.Id = "fallback2@wtfismyip.com"
-	}
-	userName := me.Id[:strings.Index(me.Id, "@")]
-	conn, err := xmpp.Dial("wtfismyip.com:5222", userName, "wtfismyip.com", password, new(xmpp.Config))
-	if err != nil {
-		panic(err)
-	}
-
-	if err = conn.SendStanza(xmpp.ClientPresence{XMLName: xml.Name{"jabber:client", "presence"},
-		Caps: new(xmpp.ClientCaps)}); err != nil {
-		panic(err)
-	}
-
+	
 	contacts := NewContacts()
-	convos := NewConversations(conn, contacts)
+	convos := NewConversations(contacts)
 
 	qml.Init(nil)
 
@@ -42,16 +27,45 @@ func main() {
 
 	engine.Context().SetVar("convos", convos)
 
-	contacts.add(me)
+	engine.Context().SetVar("xmpp", convos)
 
-	go requestRoster(conn, contacts)
-
-	go runXmpp(conn, convos, contacts)
+	qml.RegisterTypes("Fallback.Messenger.FileIO", 1, 0, []qml.TypeSpec{{
+		Init: func(f *FileIO, obs qml.Object){},
+	}})
 
 	if err := runQml(engine); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func (c *Conversations) Login(user, token string){
+	config := &xmpp.Config{
+		Authentication: &xmpp.Auth{
+			Mechanism: "X-OAUTH2",
+			Service: "oauth2",
+			Namespace: "http://www.google.com/talk/protocol/auth"}}
+	fmt.Println("pre dial")
+	conn, err := xmpp.Dial("talk.google.com:5222", user, "gmail.com", token, config)
+	c.conn = conn
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("post dial")
+	me = &Contact{Id: user, Alias: "Me", IsMe: true}
+	c.contacts.add(me)
+
+	if err = c.conn.SendStanza(xmpp.ClientPresence{XMLName: xml.Name{"jabber:client", "presence"},
+		Caps: new(xmpp.ClientCaps)}); err != nil {
+		panic(err)
+	}
+
+	fmt.Println("request roster")
+	go requestRoster(c.conn, c.contacts)
+
+	fmt.Println("runn xmpp")
+	go runXmpp(c)
+
 }
 
 type Conversations struct {
@@ -61,9 +75,9 @@ type Conversations struct {
 	Current  *Conversation
 }
 
-func NewConversations(connection *xmpp.Conn, contacts *Contacts) *Conversations {
+func NewConversations(contacts *Contacts) *Conversations {
 	return &Conversations{contacts: contacts,
-		conn:     connection,
+		conn:     nil,
 		ConvoMap: make(map[string]*Conversation),
 		Current:  &Conversation{}}
 }
@@ -180,14 +194,21 @@ func runQml(engine *qml.Engine) error {
 	return nil
 }
 
-func runXmpp(conn *xmpp.Conn, convos *Conversations, contacts *Contacts) {
+func runXmpp(convos *Conversations) {
+	conn := convos.conn
+	contacts := convos.contacts
+
 	s, err := conn.Next()
 	for ; err == nil; s, err = conn.Next() {
 
 		switch val := s.Value.(type) {
 		case *xmpp.ClientMessage:
 			fmt.Printf("Client Message: %#v\n", val)
-			sender := val.From[:strings.LastIndex(val.From, "/")]
+			sender := val.From
+			slashIndex := strings.LastIndex(sender, "/")
+			if slashIndex > -1 {
+				sender = sender[:slashIndex]
+			}
 			convo := convos.Get(sender)
 			if val.Body != "" {
 				convo.AddMsg(&Message{Sender: contacts.GetById(sender), Msg: val.Body})
@@ -236,4 +257,24 @@ func requestRoster(conn *xmpp.Conn, contacts *Contacts) {
 		fmt.Printf("%#v\n", r)
 		contacts.add(&Contact{Id: r.Jid, Alias: r.Name})
 	}
+}
+
+
+type FileIO struct {
+	Source string
+}
+
+func (_ *FileIO) HomePath() string {
+	return os.Getenv("HOME");
+}
+
+func (fIO *FileIO) Read() string {
+	//todo add error
+	buf, _ := ioutil.ReadFile(fIO.Source)
+	return string(buf)
+}
+
+func (fIO *FileIO) Write(in string) {
+	//todo error handling
+	ioutil.WriteFile(fIO.Source, []byte(in), 0700)
 }

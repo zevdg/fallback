@@ -1,5 +1,6 @@
 import QtQuick 2.0
 import Ubuntu.Components 0.1
+import QtWebKit 3.0
 
 MainView {
     width: units.gu(48)
@@ -7,6 +8,7 @@ MainView {
 
     PageStack {
             id: pageStack
+            Component.onCompleted: initialize();
 
         Tabs {
             id: tabs
@@ -141,6 +143,71 @@ MainView {
                 }
             }
         }
+
+        Page {
+            id: firstRun
+            visible: false
+            title: "Fallback Messenger"
+
+            Button {
+                anchors.centerIn: parent
+                onClicked: {
+                    pageStack.push(oauthPage)
+                }
+                text: "Sign in to Google"
+            }
+
+            tools: ToolbarItems {
+                        locked: true
+                        opened: false
+                    }
+
+        }
+
+        Page {
+            id: oauthPage
+            visible: false
+            title: "Google Authentication"
+            WebView {
+                id: webview
+                url: oauth.getInitialRequestUrl()
+                width: parent.width
+                height: parent.height
+
+                onNavigationRequested: {
+                    // detectCodeResponse
+                    if (oauth.getCodeFromUrl(request.url)) {
+                        request.action = WebView.IgnoreRequest;
+                        oauth.getAccessToken(loginWithToken)
+                        while(pageStack.depth > 1){
+                            pageStack.pop();
+                        }
+                    } else {
+                        request.action = WebView.AcceptRequest;
+                    }
+                }
+            }
+
+        }
     }
 
+    function initialize(){
+    	console.log("initializing...");
+        pageStack.push(tabs);
+        if(!oauth.refreshAccessToken(loginWithToken)){
+            pageStack.push(firstRun);
+        }
+    }
+
+    GoogleAuthentication{
+        id: oauth
+    }
+
+    function loginWithToken (accessToken){
+        oauth.getEmail(function(email){
+        	console.log("attempting login...");
+            convos.login(email, accessToken)
+            console.log("finished login")
+        })
+    }
 }
