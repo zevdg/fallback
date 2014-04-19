@@ -12,9 +12,11 @@ import (
 )
 
 var me *Contact
+var APP_ID string
 
 func main() {
-	os.Setenv("APP_ID", "fallback")
+	APP_ID = "com.ubuntu.developer.zev.fallback"
+	os.Setenv("APP_ID", APP_ID)
 	
 	contacts := NewContacts()
 	convos := NewConversations(contacts)
@@ -261,20 +263,43 @@ func requestRoster(conn *xmpp.Conn, contacts *Contacts) {
 
 
 type FileIO struct {
-	Source string
+	dataDir string
 }
 
-func (_ *FileIO) HomePath() string {
-	return os.Getenv("HOME");
+func (fIO *FileIO) DataDir() string {
+	if fIO.dataDir == "" {
+		path := os.Getenv("XDG_DATA_HOME")
+		if path == ""{
+			path = os.Getenv("HOME")+"/.local/share"
+		}
+		fIO.dataDir = path + "/" + APP_ID
+	}
+	return fIO.dataDir
+}
+
+
+func (fIO *FileIO) TokenPath() string {
+	return fIO.DataDir() + "/token"
 }
 
 func (fIO *FileIO) Read() string {
 	//todo add error
-	buf, _ := ioutil.ReadFile(fIO.Source)
+	buf, _ := ioutil.ReadFile(fIO.TokenPath())
 	return string(buf)
 }
 
 func (fIO *FileIO) Write(in string) {
+
+	if fi, err := os.Stat(fIO.DataDir()); err != nil {
+    	if os.IsNotExist(err) {
+	        os.Mkdir(fIO.DataDir(), 0755)
+	    } else {
+	        panic(err)
+	    }
+	}else if !fi.IsDir() {
+		panic("data path '"+fIO.DataDir() + "' is a file.  It should be a directory!")
+	}
+
 	//todo error handling
-	ioutil.WriteFile(fIO.Source, []byte(in), 0700)
+	ioutil.WriteFile(fIO.TokenPath(), []byte(in), 0700)
 }

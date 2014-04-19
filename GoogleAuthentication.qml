@@ -125,7 +125,5 @@ Rectangle {
 
     FileIO {
         id: oauthFile
-        source: oauthFile.homePath() + "/.fallback/oauth"
-        //onError: console.log(msg)
     }
 }
