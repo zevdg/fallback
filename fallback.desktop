@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Fallback Messenger
+Exec=./fallback
+Icon=fallback.png
+Terminal=false
+Type=Application
+X-Ubuntu-Touch=true
