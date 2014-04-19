@@ -192,7 +192,6 @@ MainView {
     }
 
     function initialize(){
-    	console.log("initializing...");
         pageStack.push(tabs);
         if(!oauth.refreshAccessToken(loginWithToken)){
             pageStack.push(firstRun);
