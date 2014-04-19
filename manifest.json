@@ -2,7 +2,7 @@
     "name": "com.ubuntu.developer.zev.fallback",
     "description": "The smart IM/SMS client",
     "framework": "ubuntu-sdk-14.04-qml-dev1",
-    "architecture": "arm",
+    "architecture": "all",
     "title": "Fallback Messenger",
     "hooks": {
         "fallback": {

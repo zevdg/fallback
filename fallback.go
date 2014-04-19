@@ -151,11 +151,14 @@ func (c *Contacts) add(contact *Contact) {
 	if !contact.IsMe {
 		c.contactList = append(c.contactList, contact)
 		c.Len++
-		qml.Changed(c, &c.Len)
+		fmt.Printf("adding contact #%d\n", c.Len)
+		//qml.Changed(c, &c.Len)
 	}
 }
 
 func (c *Contacts) GetByIndex(index int) *Contact {
+	fmt.Printf("requesting #%d of %d\n", index, len(c.contactList))
+	fmt.Printf("contact list %#v\n", *c.contactList[index])
 	return c.contactList[index]
 }
 
@@ -259,6 +262,7 @@ func requestRoster(conn *xmpp.Conn, contacts *Contacts) {
 		fmt.Printf("%#v\n", r)
 		contacts.add(&Contact{Id: r.Jid, Alias: r.Name})
 	}
+	qml.Changed(contacts, &contacts.Len)
 }
 
 type FileIO struct {
