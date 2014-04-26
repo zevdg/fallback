@@ -8,12 +8,14 @@ At it's core, Fallback will be a multi-protocol IM client (like pidgin), but Fal
  For updates and release announcements, [subscribe here](https://plus.google.com/u/0/communities/101599674231948077682) and turn on notifications.
 
 ## Tentative Roadmap Milestones
-- a simple xmpp client
-- gchat support with [Ubuntu.OnlineAccounts API](http://developer.ubuntu.com/api/qml/sdk-14.04/Ubuntu.OnlineAccounts/)
+- ~~a simple xmpp client~~
+- ~~google hangouts (a.k.a google talk, gtalk, gchat) support~~
+- release as click app on Ubuntu Touch
 - merge contacts between multiple accounts and phone's contact list
 - SMS support
 - implement "fallback" logic (automatically choose service based on availability)
 - facebook chat support
+- [Ubuntu.OnlineAccounts API](http://developer.ubuntu.com/api/qml/sdk-14.04/Ubuntu.OnlineAccounts/) integration
 
 ## Setup
 #### Prereqs
