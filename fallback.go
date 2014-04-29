@@ -20,6 +20,7 @@ func main() {
 
 	contacts := NewContacts()
 	convos := NewConversations(contacts)
+	defer convos.Disconnect()
 
 	qml.Init(nil)
 
@@ -57,8 +58,9 @@ func (c *Conversations) Login(user, token string) {
 	me = &Contact{Id: user, Alias: "Me", IsMe: true}
 	c.contacts.add(me)
 
-	if err = c.conn.SendStanza(xmpp.ClientPresence{XMLName: xml.Name{"jabber:client", "presence"},
-		Caps: new(xmpp.ClientCaps)}); err != nil {
+	if err = c.conn.SendStanza(&xmpp.ClientPresence{XMLName: xml.Name{"jabber:client", "presence"},
+		Caps: new(xmpp.ClientCaps),
+	}); err != nil {
 		panic(err)
 	}
 
@@ -68,6 +70,11 @@ func (c *Conversations) Login(user, token string) {
 	fmt.Println("runn xmpp")
 	go runXmpp(c)
 
+}
+
+func (c *Conversations) Disconnect() {
+	c.conn.SendStanza(&xmpp.ClientPresence{XMLName: xml.Name{"jabber:client", "presence"},
+		Type: "unavailable"})
 }
 
 type Conversations struct {
@@ -117,8 +124,6 @@ type Message struct {
 	Sender *Contact
 	Msg    string
 }
-
-//func (m Message)
 
 func (c *Conversation) AddMsg(msg *Message) {
 	c.history = append(c.history, msg)
