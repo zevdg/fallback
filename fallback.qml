@@ -51,9 +51,27 @@ MainView {
                             }
                         }
                     }
+                    /*
+                    Rectangle {
+                         id: simplebutton
+                         color: "grey"
+                         width: 150; height: 75
 
+                         MouseArea{
+                             id: buttonMouseArea
+
+                             anchors.fill: parent //anchor all sides of the mouse area to the rectangle's anchors
+                                     //onClicked handles valid mouse button clicks
+                             onClicked: convos.disconnect()
+                         }
+                     }
+                     */
                     ListView {
-                        anchors.fill: parent
+                        //anchors.top: simplebutton.bottom
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
                         model: contactModel.len
                         delegate: contactDelegate
                         focus: true
