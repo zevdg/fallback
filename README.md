@@ -18,9 +18,14 @@ At it's core, Fallback will be a multi-protocol IM client (like pidgin), but Fal
 - [Ubuntu.OnlineAccounts API](http://developer.ubuntu.com/api/qml/sdk-14.04/Ubuntu.OnlineAccounts/) integration
 
 ## Setup
-#### Prereqs
+wget https://raw.githubusercontent.com/psywolf/fallback/master/dev_env_setup.sh
+source dev_env_setup.sh
+
+
+#### Alternatively, install prereqs
 golang 1.2 or higher
 Ubuntu Touch SDK
+go-qml
 
 #### Checkout
 go get github.com/psywolf/fallback
@@ -29,7 +34,7 @@ go get github.com/psywolf/fallback
 #### Compile
 cd $GOPATH/src/github.com/psywolf/fallback
 
-go build
+go install
 
 #### Run
-./fallback
+../../../../bin/fallback
