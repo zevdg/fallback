@@ -22,6 +22,8 @@ func main() {
 	convos := NewConversations(contacts)
 	defer convos.Disconnect()
 
+	fmt.Println("loading program!!!")
+
 	qml.Init(nil)
 
 	engine := qml.NewEngine()

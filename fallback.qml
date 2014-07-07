@@ -147,6 +147,7 @@ MainView {
                     }
 
                     function send(){
+                        console.log("sending!!!")
                         if( entry.text == ""){
                             return;
                         }
