@@ -20,14 +20,15 @@ At it's core, Fallback will be a multi-protocol IM client (like pidgin), but Fal
 ## Setup
 wget https://raw.githubusercontent.com/psywolf/fallback/master/dev_env_setup.sh
 source dev_env_setup.sh
+tested on a fresh install of 14.04 64 bit
+(warning: this script will set your gopath to $HOME/go)
 
-
-#### Alternatively, install prereqs
+#### Alternatively, install prereqs and then clone
+#Prereqs
 golang 1.2 or higher
 Ubuntu Touch SDK
 go-qml
-
-#### Checkout
+#clone
 go get github.com/psywolf/fallback
 
 
@@ -37,4 +38,4 @@ cd $GOPATH/src/github.com/psywolf/fallback
 go install
 
 #### Run
-../../../../bin/fallback
+$GOPATH/bin/fallback
